@@ -2,7 +2,7 @@ version: "3"
 
 services:
   backend:
-    container_name: public-speaking-in-kazakh
+    container_name: backend
     restart: always
     build: ./app
     volumes:
