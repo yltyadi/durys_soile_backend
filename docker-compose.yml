@@ -6,7 +6,7 @@ services:
     restart: always
     build: ./app
     volumes:
-      - ./audio:/home/python/src/app/audio:ro
+      - /duryssoile/backend/audio:/home/python/src/app/audio:ro
     environment:
       - AUDIO_PATH=/home/python/src/app/audio
       - MONGODB_URL=mongodb://root:pass@mongo:27017/duryssoile?retryWrites=true&w=majority&authSource=admin
