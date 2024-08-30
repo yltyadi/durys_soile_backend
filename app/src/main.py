@@ -110,9 +110,11 @@ def get_audio(word_id: int):
 
 
 @app.get('/migrate')
-def migrate():
-    delete_result = data.delete_many({})
-    print(f"Deleted {delete_result.deleted_count} documents")
+async def migrate():
+    data.delete_many({})
+    print("Deleted all documents")
+
     for i in range(len(words)):
         data.insert_one(dict(words[i]))
-    return {"state": "completed"}
+    return {'status': 'success'}
+
