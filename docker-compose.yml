@@ -22,7 +22,7 @@ services:
       - backend
 
   mongo:
-    image: mongo:latest
+    image: mongo:4.4
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
