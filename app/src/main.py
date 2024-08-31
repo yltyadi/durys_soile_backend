@@ -2,7 +2,6 @@ import os
 import json
 from enum import Enum
 from pathlib import Path
-from copy import deepcopy
 from fastapi.responses import FileResponse
 
 from fastapi import FastAPI, HTTPException
@@ -15,29 +14,6 @@ db = client.duryssoile
 data = db.get_collection("data")
 
 
-def extracted(key_to_extract, original_dict):
-    returned_dict = deepcopy(original_dict)
-    extracted_value = returned_dict.pop(key_to_extract)
-    return extracted_value, returned_dict
-
-
-def load_json(filename):
-    with open(filename, mode='r', encoding='utf-8') as file:
-        return json.load(file)
-
-
-def add_word_type(words, word_type, filename):
-    for word in load_json(filename):
-        word_id, word_info = extracted('id', word)
-        word_info |= {'type': word_type}
-        words.update({word_id: word_info})
-
-
-words = {}
-add_word_type(words, 'parasite', 'parasite.json')
-add_word_type(words, 'commonly-mispronounced', 'commonly-mispronounced.json')
-
-
 class WordType(str, Enum):
     parasite = 'parasite'
     commonly_mispronounced = 'commonly-mispronounced'
@@ -48,7 +24,18 @@ class SortingOrder(str, Enum):
     descending = 'desc'
 
 
-def validate_pagination_parameters(offset, limit):
+async def retrieve_all_data():
+    cursor = data.find()
+    documents = []
+    async for document in cursor:
+        document.pop('_id')
+        documents.append(document)
+    return documents
+
+
+@app.get('/words')
+async def get_words(type: WordType, filter: str = '', offset: int = 0, limit: int = 20,
+                    sort: SortingOrder = SortingOrder.ascending):
     details = []
 
     if offset < 0:
@@ -64,14 +51,10 @@ def validate_pagination_parameters(offset, limit):
     if details:
         raise HTTPException(status_code=400, detail=details)
 
-
-@app.get('/words')
-def get_words(type: WordType, filter: str = '', offset: int = 0, limit: int = 20,
-              sort: SortingOrder = SortingOrder.ascending):
-    validate_pagination_parameters(offset, limit)
+    words = await retrieve_all_data()
 
     # filter by word type
-    result_ids = [word_id for word_id in words if words[word_id]['type'] == type]
+    result_ids = [word_id for word_id in range(len(words)) if words[word_id]['type'] == type]
 
     # filter by 'filter' argument value
     result_ids = [word_id for word_id in result_ids if words[word_id]['word'].lower().startswith(filter.lower())]
@@ -90,7 +73,8 @@ def get_words(type: WordType, filter: str = '', offset: int = 0, limit: int = 20
 
 
 @app.get('/words/{word_id}')
-def get_word(word_id: int):
+async def get_word(word_id: int):
+    words = await retrieve_all_data()
     if word_id not in range(len(words)):
         raise HTTPException(status_code=404, detail='Not Found')
 
@@ -101,7 +85,8 @@ def get_word(word_id: int):
 
 
 @app.get('/audio/{word_id}')
-def get_audio(word_id: int):
+async def get_audio(word_id: int):
+    words = await retrieve_all_data()
     if word_id not in range(len(words)):
         raise HTTPException(status_code=404, detail='Not Found')
 
@@ -111,10 +96,22 @@ def get_audio(word_id: int):
 
 @app.get('/migrate')
 async def migrate():
-    data.delete_many({})
+    def add_word_type(words, word_type, filename):
+        def load_json():
+            with open(filename, mode='r', encoding='utf-8') as file:
+                return json.load(file)
+
+        for word in load_json():
+            word |= {'type': word_type}
+            words.append(word)
+
+    await data.delete_many({})
     print("Deleted all documents")
 
-    for i in range(len(words)):
-        data.insert_one(dict(words[i]))
-    return {'status': 'success'}
+    words = []
+    add_word_type(words, 'parasite', 'parasite.json')
+    add_word_type(words, 'commonly-mispronounced', 'commonly-mispronounced.json')
 
+    for word in words:
+        data.insert_one(word)
+    return {'status': 'success'}
