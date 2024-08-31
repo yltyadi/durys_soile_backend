@@ -9,7 +9,7 @@ services:
       - /home/vadmin/duryssoile/backend/audio:/home/python/src/app/audio:ro
     environment:
       - AUDIO_PATH=/home/python/src/app/audio
-      - MONGODB_URL=mongodb://root:pass@mongo:27017/duryssoile?retryWrites=true&w=majority&authSource=admin
+      - MONGODB_URL=mongodb://root:pass@mongo:27017?retryWrites=true&w=majority&authSource=admin
     command: hypercorn -w 4 -b 0.0.0.0:80 main:app
 
   nginx:

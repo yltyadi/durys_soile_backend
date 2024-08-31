@@ -6,12 +6,12 @@ from fastapi.responses import FileResponse
 
 from fastapi import FastAPI, HTTPException
 
-import motor.motor_asyncio
+import pymongo
 
 app = FastAPI(root_path='/api/v1.0')
-client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_URL"])
+client = pymongo.MongoClient(os.environ["MONGODB_URL"])
 db = client.duryssoile
-data = db.get_collection("data")
+data = db.data
 
 
 class WordType(str, Enum):
@@ -24,73 +24,54 @@ class SortingOrder(str, Enum):
     descending = 'desc'
 
 
-async def retrieve_all_data():
-    cursor = data.find()
-    documents = []
-    async for document in cursor:
-        document.pop('_id')
-        documents.append(document)
-    return documents
-
-
 @app.get('/words')
-async def get_words(type: WordType, filter: str = '', offset: int = 0, limit: int = 20,
-                    sort: SortingOrder = SortingOrder.ascending):
+def get_words(type: WordType, filter: str = '', offset: int = 0, limit: int = 20,
+              sort: SortingOrder = SortingOrder.ascending):
     details = []
-
     if offset < 0:
         details.append(
             {'loc': ['query', 'offset'], 'msg': 'value is not in a valid range; valid range: non-negative numbers',
              'type': 'value_error'})
-
     if limit < 0:
         details.append(
             {'loc': ['query', 'limit'], 'msg': 'value is not in a valid range; valid range: non-negative numbers',
              'type': 'value_error'})
-
     if details:
         raise HTTPException(status_code=400, detail=details)
 
-    words = await retrieve_all_data()
+    cursor = data.find({})
+    documents = []
+    for document in cursor:
+        if document['type'] != type:
+            continue
+        if filter != '' and not document['word'].lower().startswith(filter.lower()):
+            continue
+        document.pop('_id')
+        document.pop('filename')
+        documents.append(document)
 
-    # filter by word type
-    result_ids = [word_id for word_id in range(len(words)) if words[word_id]['type'] == type]
-
-    # filter by 'filter' argument value
-    result_ids = [word_id for word_id in result_ids if words[word_id]['word'].lower().startswith(filter.lower())]
-
-    # ordering depending on 'sort' argument value
+    documents = sorted(documents, key=lambda k: k['id'])
     if sort == SortingOrder.descending:
-        result_ids.reverse()
-
-    # applying pagination
-    result_ids = result_ids[offset * limit: (offset + 1) * limit]
-
-    # formatting response (adding 'id' field, removing 'filename', creating array of objects)
-    results = [{'id': word_id} | {x: y for x, y in words[word_id].items() if x != 'filename'} for word_id in result_ids]
-
-    return results
+        documents.reverse()
+    return documents[offset * limit: (offset + 1) * limit]
 
 
 @app.get('/words/{word_id}')
 async def get_word(word_id: int):
-    words = await retrieve_all_data()
-    if word_id not in range(len(words)):
+    if word_id not in range(data.count_documents({})):
         raise HTTPException(status_code=404, detail='Not Found')
-
-    # formatting response (adding 'id' field, removing 'filename')
-    results = {'id': word_id} | {x: y for x, y in words[word_id].items() if x != 'filename'}
-
-    return results
+    word = data.find_one({'id': word_id})
+    word.pop('_id')
+    word.pop('filename')
+    return word
 
 
 @app.get('/audio/{word_id}')
 async def get_audio(word_id: int):
-    words = await retrieve_all_data()
-    if word_id not in range(len(words)):
+    if word_id not in range(data.count_documents({})):
         raise HTTPException(status_code=404, detail='Not Found')
-
-    path = Path(os.getenv('AUDIO_PATH')) / Path(words[word_id]['type']) / Path(words[word_id]['filename'])
+    word = data.find_one({'id': word_id})
+    path = Path(os.getenv('AUDIO_PATH')) / Path(word['type']) / Path(word['filename'])
     return FileResponse(path)
 
 
@@ -105,7 +86,7 @@ async def migrate():
             word |= {'type': word_type}
             words.append(word)
 
-    await data.delete_many({})
+    data.delete_many({})
     print("Deleted all documents")
 
     words = []
@@ -114,4 +95,4 @@ async def migrate():
 
     for word in words:
         data.insert_one(word)
-    return {'status': 'success'}
+    return {'status': 'successfully migrated'}
