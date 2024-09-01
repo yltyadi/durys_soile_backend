@@ -4,9 +4,10 @@ from enum import Enum
 from pathlib import Path
 from fastapi.responses import FileResponse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 
 import pymongo
+import shutil
 
 from models.parasite import Parasite
 
@@ -171,3 +172,16 @@ async def migrate(key: str):
     for word in words:
         data.insert_one(word)
     return {'status': 'successfully migrated'}
+
+
+@app.post("/audio")
+async def create_audio(type: WordType, file: UploadFile):
+    file_location = Path('.') / Path(type.value) / Path(file.filename)
+
+    if file_location.exists():
+        raise HTTPException(status_code=409, detail="File already exists")
+
+    with file_location.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {"filename": file.filename, "content_type": file.content_type}

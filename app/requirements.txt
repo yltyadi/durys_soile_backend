@@ -1,3 +1,5 @@
 fastapi
 hypercorn
 pymongo
+shutil
+python-multipart
