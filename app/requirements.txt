@@ -1,4 +1,3 @@
 fastapi
 hypercorn
 pymongo
-bcrypt

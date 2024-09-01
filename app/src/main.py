@@ -7,7 +7,6 @@ from fastapi.responses import FileResponse
 from fastapi import FastAPI, HTTPException
 
 import pymongo
-import bcrypt
 
 from models.parasite import Parasite
 
@@ -150,15 +149,7 @@ def post_word(id: int):
 
 @app.get('/migrate')
 async def migrate(key: str):
-    if key is None or key == '':
-        raise HTTPException(status_code=400, detail='key is not provided')
-
-    bytes = key.encode('utf-8')
-    salt = bcrypt.gensalt()
-    hash = bcrypt.hashpw(bytes, salt)
-    auth = bcrypt.checkpw(os.getenv('AUTH_KEY').encode('utf-8'), hash)
-
-    if not auth:
+    if key is None or key == '' or not key == os.getenv('AUTH_KEY'):
         raise HTTPException(status_code=401, detail='Authentication failed')
 
     def add_word_type(words, word_type, filename):
