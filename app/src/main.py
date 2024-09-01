@@ -176,7 +176,7 @@ async def migrate(key: str):
 
 @app.post("/audio")
 async def create_audio(type: WordType, file: UploadFile):
-    file_location = Path('.') / Path(type.value) / Path(file.filename)
+    file_location = Path(os.getenv('AUDIO_PATH')) / Path(type.value) / Path(file.filename)
 
     if file_location.exists():
         raise HTTPException(status_code=409, detail="File already exists")
