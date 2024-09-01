@@ -13,7 +13,7 @@ from models.parasite import Parasite
 from models.mispronounced import Mispronounced
 
 app = FastAPI(root_path='/api/v1.0')
-client = pymongo.MongoClient('mongodb://root:pass@localhost:27018?retryWrites=true&w=majority&authSource=admin')
+client = pymongo.MongoClient(os.environ["MONGODB_URL"])
 db = client.duryssoile
 data = db.data
 
