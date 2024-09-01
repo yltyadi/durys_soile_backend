@@ -149,7 +149,7 @@ def post_word(id: int):
 
 @app.get('/migrate')
 async def migrate(key: str):
-    if key is None or key == '' or not key == os.getenv('AUTH_KEY'):
+    if key is None or key == '' or key != os.getenv('AUTH_KEY'):
         raise HTTPException(status_code=401, detail='Authentication failed')
 
     def add_word_type(words, word_type, filename):
